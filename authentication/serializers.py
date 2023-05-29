@@ -3,6 +3,8 @@ from rest_framework import serializers
 from .models import User
 from django.contrib import auth
 from rest_framework.exceptions import AuthenticationFailed
+from rest_framework_simplejwt.tokens import RefreshToken, TokenError
+from django.contrib.auth.tokens import PasswordResetTokenGenerator
 
 
 class RegisterSerializer(serializers.ModelSerializer):
@@ -79,3 +81,19 @@ class LoginSerializer(serializers.ModelSerializer):
         }
 
         return super().validate(attrs)
+    
+
+
+class ResetPasswordEmailRequestSerializer(serializers.Serializer):
+    email = serializers.EmailField(min_length=10)
+
+    # redirect_url = serializers.CharField(max_length=500, required=False)
+
+    class Meta:
+        fields = ['email']
+        
+
+
+
+
+

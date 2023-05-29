@@ -1,17 +1,36 @@
 from django.shortcuts import render
-from .renderers import UserRenderer
-from rest_framework import generics, status, views
-from .serializers import RegisterSerializer,EmailVerificationSerializer, LoginSerializer
-from .models import User
+from rest_framework import generics, status, views, permissions
+from .serializers import RegisterSerializer, ResetPasswordEmailRequestSerializer, EmailVerificationSerializer, LoginSerializer
 from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
+from .models import User
 from .utils import Util
 from django.contrib.sites.shortcuts import get_current_site
 from django.urls import reverse
 import jwt
-from drf_yasg.utils import swagger_auto_schema
 from django.conf import settings
+from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
+from .renderers import UserRenderer
+from django.contrib.auth.tokens import PasswordResetTokenGenerator
+from django.utils.encoding import smart_str, force_str, smart_bytes, DjangoUnicodeDecodeError
+from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
+from django.contrib.sites.shortcuts import get_current_site
+from django.urls import reverse
+from .utils import Util
+from django.shortcuts import redirect
+from django.http import HttpResponsePermanentRedirect
+import os
+from django.utils.encoding import smart_str, force_str, smart_bytes, DjangoUnicodeDecodeError
+from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
+from django.contrib.sites.shortcuts import get_current_site
+from django.urls import reverse
+from .utils import Util
+
+
+class CustomRedirect(HttpResponsePermanentRedirect):
+
+    allowed_schemes = [os.environ.get('APP_SCHEME'), 'http', 'https']
 
 class RegisterView(generics.GenericAPIView):
 
@@ -67,3 +86,33 @@ class LoginAPIView(generics.GenericAPIView):
         serializer = self.serializer_class(data=request.data)
         serializer.is_valid(raise_exception=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
+    
+class RequestPasswordResetEmail(generics.GenericAPIView):
+    serializer_class = ResetPasswordEmailRequestSerializer
+
+    def post(self, request):
+        serializer = self.serializer_class(data=request.data)
+        email = request.data['email']
+
+        if User.objects.filter(email=email).exists():
+            user = User.objects.get(email=email)
+            uidb64 = urlsafe_base64_encode(smart_bytes(user.id))
+            token = PasswordResetTokenGenerator().make_token(user)
+            current_site = get_current_site(request=request).domain
+            relativeLink = reverse(
+                'password-reset-confirm', kwargs={'uidb64': uidb64, 'token': token})
+
+            absurl = 'http://'+current_site + relativeLink
+            email_body = 'Hello, \n Use link below to reset your password  \n' + \
+                absurl
+            data = {'email_body': email_body, 'to_email': user.email,
+                    'email_subject': 'Reset your passsword'}
+            Util.send_email(data)
+        return Response({'success': 'We have sent you a link to reset your password'}, status=status.HTTP_200_OK)
+
+
+
+class PasswordTokenCheckAPI(generics.GenericAPIView):
+
+    def get(self, request, uidb64, token):
+        pass
