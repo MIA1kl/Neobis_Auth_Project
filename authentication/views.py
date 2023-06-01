@@ -26,6 +26,8 @@ from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
 from django.contrib.sites.shortcuts import get_current_site
 from django.urls import reverse
 from .utils import Util
+import uuid
+
 
 
 class CustomRedirect(HttpResponsePermanentRedirect):
@@ -71,7 +73,7 @@ class RegisterPersonalInfoView(generics.GenericAPIView):
         if serializer.is_valid():
             # Retrieve the email associated with the provided hash
             try:
-                hash_instance = Hash.objects.get(hash=uuid.UUID(hash))
+                hash_instance = Hash.objects.get(hash=str(uuid.UUID(hash)))
             except Hash.DoesNotExist:
                 return Response({'detail': 'Invalid verification link.'}, status=status.HTTP_400_BAD_REQUEST)
             
@@ -92,11 +94,15 @@ class RegisterPasswordView(generics.GenericAPIView):
     def post(self, request):
         serializer = self.get_serializer(data=request.data)
         if serializer.is_valid():
+            try:
+                hash_instance = Hash.objects.get(hash=str(uuid.UUID(hash)))
+            except Hash.DoesNotExist:
+                return Response({'detail': 'Invalid verification link.'}, status=status.HTTP_400_BAD_REQUEST)
             # Retrieve the email and personal info from the session or previous steps
-            email = ...
+            email = hash_instance.email
             
             # Create the user in the database with the provided password
-            user = User.objects.create_user(username=email, email=email, password=serializer.validated_data['password'])
+            user = User.objects.create_user(email=email, password=serializer.validated_data['password'])
             
             # Delete the hash associated with the email
             Hash.objects.filter(email=email).delete()
