@@ -26,12 +26,11 @@ class RegisterPersonalInfoSerializer(serializers.ModelSerializer):
         fields = ['first_name','last_name','date_of_birth','email']
         
 class RegisterPasswordSerializer(serializers.ModelSerializer):
-    password = serializers.CharField(
-        max_length=68, min_length=6, write_only=True)
-    email = serializers.EmailField()
+    email = serializers.EmailField(required=True)
+    password = serializers.CharField(required=True, min_length=8)
     class Meta:
         model = User
-        fields = ['password']
+        fields = ['email','password']
 
 
 # class RegisterSerializer(serializers.ModelSerializer):

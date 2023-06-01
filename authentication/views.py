@@ -40,28 +40,38 @@ class RegisterEmailView(generics.GenericAPIView):
         user = request.data
         serializer = self.serializer_class(data=user)
         serializer.is_valid(raise_exception=True)
+
+        email = serializer.validated_data['email']
+        try:
+            hash_obj = Hash.objects.get(email=email)
+            if hash_obj.is_verified:
+                return Response({'detail': 'Email already exists.'}, status=status.HTTP_400_BAD_REQUEST)
+            else:
+                hash_obj.delete()
+        except Hash.DoesNotExist:
+            pass
+        
         serializer.save()
         user_data = serializer.data
         user = Hash.objects.get(email=user_data['email'])
         token = RefreshToken.for_user(user).access_token
         current_site = get_current_site(request).domain
         relativeLink = reverse('email-verify')
-        absurl = 'http://'+current_site+relativeLink+"?token="+str(token)
-        email_body = 'Hi ' + \
-            ' Use the link below to verify your email \n' + absurl
-        data = {'email_body': email_body, 'to_email': user.email,
-                'email_subject': 'Verify your email'}
+        absurl = 'http://' + current_site + relativeLink + "?token=" + str(token)
+        email_body = 'Hi ' + ' Use the link below to verify your email \n' + absurl
+        data = {'email_body': email_body, 'to_email': user.email, 'email_subject': 'Verify your email'}
 
         Util.send_email(data)
         return Response(user_data, status=status.HTTP_200_OK)
 
 class RegisterPersonalInfoView(generics.GenericAPIView):
+    serializer_class = RegisterPersonalInfoSerializer
     def post(self, request, hash):
-        serializer = RegisterPersonalInfoSerializer(data=request.data)
+        serializer = self.get_serializer_class()(data=request.data)
         if serializer.is_valid():
             # Retrieve the email associated with the provided hash
             try:
-                hash_instance = Hash.objects.get(hash=hash)
+                hash_instance = Hash.objects.get(hash=uuid.UUID(hash))
             except Hash.DoesNotExist:
                 return Response({'detail': 'Invalid verification link.'}, status=status.HTTP_400_BAD_REQUEST)
             
@@ -78,14 +88,15 @@ class RegisterPersonalInfoView(generics.GenericAPIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
 class RegisterPasswordView(generics.GenericAPIView):
+    serializer_class = RegisterPasswordSerializer
     def post(self, request):
-        serializer = RegisterPasswordSerializer(data=request.data)
+        serializer = self.get_serializer(data=request.data)
         if serializer.is_valid():
             # Retrieve the email and personal info from the session or previous steps
             email = ...
             
             # Create the user in the database with the provided password
-            user = User.objects.create_user(email=email, password=serializer.validated_data['password'])
+            user = User.objects.create_user(username=email, email=email, password=serializer.validated_data['password'])
             
             # Delete the hash associated with the email
             Hash.objects.filter(email=email).delete()
@@ -100,23 +111,21 @@ class RegisterPasswordView(generics.GenericAPIView):
 class VerifyEmail(views.APIView):
     serializer_class = EmailVerificationSerializer
 
-    token_param_config = openapi.Parameter(
-        'token', in_=openapi.IN_QUERY, description='Description', type=openapi.TYPE_STRING)
-
-    @swagger_auto_schema(manual_parameters=[token_param_config])
     def get(self, request):
         token = request.GET.get('token')
         try:
             payload = jwt.decode(token, settings.SECRET_KEY, algorithms='HS256')
-            user = User.objects.get(id=payload['user_id'])
+            user_id = payload['user_id']
+            user = User.objects.get(id=user_id)
             if not user.is_verified:
                 user.is_verified = True
                 user.save()
             return Response({'email': 'Successfully activated'}, status=status.HTTP_200_OK)
-        except jwt.ExpiredSignatureError as identifier:
-            return Response({'error': 'Activation Expired'}, status=status.HTTP_400_BAD_REQUEST)
-        except jwt.exceptions.DecodeError as identifier:
-            return Response({'error': 'Invalid token'}, status=status.HTTP_400_BAD_REQUEST)
+        except jwt.ExpiredSignatureError:
+            return Response({'error': 'Activation link has expired'}, status=status.HTTP_400_BAD_REQUEST)
+        except (jwt.exceptions.DecodeError, User.DoesNotExist):
+            return Response({'error': 'Invalid activation link'}, status=status.HTTP_400_BAD_REQUEST)
+
         
 
 class LoginAPIView(generics.GenericAPIView):
