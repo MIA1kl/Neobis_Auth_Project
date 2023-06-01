@@ -2,6 +2,8 @@ from django.db import models
 
 from django.contrib.auth.models import (AbstractBaseUser, BaseUserManager, PermissionsMixin)
 from rest_framework_simplejwt.tokens import RefreshToken
+import uuid
+from django.utils import timezone
 
 
 class UserManager(BaseUserManager):
@@ -30,7 +32,6 @@ class UserManager(BaseUserManager):
     
 class User(AbstractBaseUser, PermissionsMixin):
     email = models.EmailField(max_length=255, unique=True, db_index=True)
-    username = models.CharField(max_length=255, unique=True, db_index = True)
     first_name = models.CharField(max_length=255, null=True, blank=True)
     last_name = models.CharField(max_length=255, null=True, blank=True)
     birth_date = models.DateField(null=True, blank=True, default=None)
@@ -42,7 +43,6 @@ class User(AbstractBaseUser, PermissionsMixin):
 
     
     USERNAME_FIELD = 'email'
-    REQUIRED_FIELDS = ['username']
     
     objects = UserManager()
     
@@ -57,3 +57,11 @@ class User(AbstractBaseUser, PermissionsMixin):
             'access': str(refresh.access_token)
         }
         
+class Hash(models.Model):
+    email = models.EmailField(max_length=255, unique=True, db_index=True)
+    hash = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)
+    created_at = models.DateTimeField(default=timezone.now)
+    
+    
+    def __str__(self):
+        return str(self.hash)

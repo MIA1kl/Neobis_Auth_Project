@@ -1,9 +1,9 @@
 from django.shortcuts import render
 from rest_framework import generics, status, views, permissions
-from .serializers import RegisterSerializer, ResetPasswordEmailRequestSerializer, EmailVerificationSerializer, LoginSerializer, SetNewPasswordSerializer
+from .serializers import ResetPasswordEmailRequestSerializer, EmailVerificationSerializer, LoginSerializer, SetNewPasswordSerializer, RegisterEmailSerializer, RegisterPersonalInfoSerializer, RegisterPasswordSerializer
 from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
-from .models import User
+from .models import User, Hash
 from .utils import Util
 from django.contrib.sites.shortcuts import get_current_site
 from django.urls import reverse
@@ -31,10 +31,9 @@ from .utils import Util
 class CustomRedirect(HttpResponsePermanentRedirect):
 
     allowed_schemes = [os.environ.get('APP_SCHEME'), 'http', 'https']
-
-class RegisterView(generics.GenericAPIView):
-
-    serializer_class = RegisterSerializer
+    
+class RegisterEmailView(generics.GenericAPIView):
+    serializer_class = RegisterEmailSerializer
     renderer_classes = (UserRenderer,)
 
     def post(self, request):
@@ -43,18 +42,59 @@ class RegisterView(generics.GenericAPIView):
         serializer.is_valid(raise_exception=True)
         serializer.save()
         user_data = serializer.data
-        user = User.objects.get(email=user_data['email'])
+        user = Hash.objects.get(email=user_data['email'])
         token = RefreshToken.for_user(user).access_token
         current_site = get_current_site(request).domain
         relativeLink = reverse('email-verify')
         absurl = 'http://'+current_site+relativeLink+"?token="+str(token)
-        email_body = 'Hi '+user.username + \
+        email_body = 'Hi ' + \
             ' Use the link below to verify your email \n' + absurl
         data = {'email_body': email_body, 'to_email': user.email,
                 'email_subject': 'Verify your email'}
 
         Util.send_email(data)
-        return Response(user_data, status=status.HTTP_201_CREATED)
+        return Response(user_data, status=status.HTTP_200_OK)
+
+class RegisterPersonalInfoView(generics.GenericAPIView):
+    def post(self, request, hash):
+        serializer = RegisterPersonalInfoSerializer(data=request.data)
+        if serializer.is_valid():
+            # Retrieve the email associated with the provided hash
+            try:
+                hash_instance = Hash.objects.get(hash=hash)
+            except Hash.DoesNotExist:
+                return Response({'detail': 'Invalid verification link.'}, status=status.HTTP_400_BAD_REQUEST)
+            
+            email = hash_instance.email
+            
+            # Ensure that the provided email matches the email in the hash
+            if email != serializer.validated_data['email']:
+                return Response({'detail': 'Email mismatch.'}, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Use the retrieved email and the provided personal info to perform further processing
+            # Store the personal info in session or associate it with the email
+            
+            return Response(status=status.HTTP_200_OK)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+class RegisterPasswordView(generics.GenericAPIView):
+    def post(self, request):
+        serializer = RegisterPasswordSerializer(data=request.data)
+        if serializer.is_valid():
+            # Retrieve the email and personal info from the session or previous steps
+            email = ...
+            
+            # Create the user in the database with the provided password
+            user = User.objects.create_user(email=email, password=serializer.validated_data['password'])
+            
+            # Delete the hash associated with the email
+            Hash.objects.filter(email=email).delete()
+            
+            return Response(status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+
+
 
 
 class VerifyEmail(views.APIView):

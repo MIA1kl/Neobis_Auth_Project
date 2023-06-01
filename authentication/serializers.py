@@ -1,6 +1,6 @@
 
 from rest_framework import serializers
-from .models import User
+from .models import User, Hash
 from django.contrib import auth
 from rest_framework.exceptions import AuthenticationFailed
 from rest_framework_simplejwt.tokens import RefreshToken, TokenError
@@ -10,28 +10,52 @@ from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
 from django.contrib.sites.shortcuts import get_current_site
 
 
-class RegisterSerializer(serializers.ModelSerializer):
-    password = serializers.CharField(
-        max_length=68, min_length=6, write_only=True)
+class RegisterEmailSerializer(serializers.ModelSerializer):
+    email = serializers.EmailField()
+    class Meta:
+        model = Hash
+        fields = ['email']
 
-    default_error_messages = {
-        'username': 'The username should only contain alphanumeric characters'}
-
+class RegisterPersonalInfoSerializer(serializers.ModelSerializer):
+    first_name = serializers.CharField(max_length=255)
+    last_name = serializers.CharField(max_length=255)
+    date_of_birth = serializers.DateField()
+    email = serializers.EmailField()
     class Meta:
         model = User
-        fields = ['email', 'username', 'password']
+        fields = ['first_name','last_name','date_of_birth','email']
+        
+class RegisterPasswordSerializer(serializers.ModelSerializer):
+    password = serializers.CharField(
+        max_length=68, min_length=6, write_only=True)
+    email = serializers.EmailField()
+    class Meta:
+        model = User
+        fields = ['password']
 
-    def validate(self, attrs):
-        email = attrs.get('email', '')
-        username = attrs.get('username', '')
 
-        if not username.isalnum():
-            raise serializers.ValidationError(
-                self.default_error_messages)
-        return attrs
+# class RegisterSerializer(serializers.ModelSerializer):
+#     password = serializers.CharField(
+#         max_length=68, min_length=6, write_only=True)
 
-    def create(self, validated_data):
-        return User.objects.create_user(**validated_data)
+#     default_error_messages = {
+#         'username': 'The username should only contain alphanumeric characters'}
+
+#     class Meta:
+#         model = User
+#         fields = ['email', 'username', 'password']
+
+#     def validate(self, attrs):
+#         email = attrs.get('email', '')
+#         username = attrs.get('username', '')
+
+#         if not username.isalnum():
+#             raise serializers.ValidationError(
+#                 self.default_error_messages)
+#         return attrs
+
+#     def create(self, validated_data):
+#         return User.objects.create_user(**validated_data)
 
 
 class EmailVerificationSerializer(serializers.ModelSerializer):
