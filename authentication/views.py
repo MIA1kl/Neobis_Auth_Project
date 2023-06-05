@@ -68,7 +68,7 @@ class RegisterEmailView(generics.GenericAPIView):
         
          # Store the user's email in the session
         session = SessionStore(request.data.get('session_key'))
-        session['user_email'] = user.email
+        session['email'] = user.email
         session.save()
 
         return Response(user_data, status=status.HTTP_200_OK)
@@ -91,7 +91,7 @@ class VerifyEmail(views.APIView):
                 
                  # Retrieve the user's email from the session
                 session = SessionStore(request.GET.get('session_key'))
-                user_email = session.get('user_email')
+                user_email = session.get('email', None)
 
                 # Redirect to the personal info registration page
                 return redirect(reverse('register-personal-info') + f'?email={user_email}')
