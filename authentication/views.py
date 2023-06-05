@@ -51,10 +51,16 @@ class RegisterEmailView(generics.GenericAPIView):
         serializer.save()
         user_data = serializer.data
         user = User.objects.get(email=user_data['email'])
-        token = RefreshToken.for_user(user).access_token
+        
+        token = RefreshToken.for_user(user)
+        token_payload = {'email': user.email}
+        token['email'] = user.email
+        token['payload'] = token_payload
+        token = str(token.access_token)
+        
         current_site = get_current_site(request).domain
         relativeLink = reverse('email-verify')
-        absurl = 'http://'+current_site+relativeLink+"?token="+str(token)
+        absurl = 'http://'+current_site+relativeLink+"?token="+token
         email_body = 'Hi ' + ' Use the link below to verify your email \n' + absurl
         data = {'email_body': email_body, 'to_email': user.email, 'email_subject': 'Verify your email'}
 
@@ -75,7 +81,8 @@ class VerifyEmail(views.APIView):
         try:
             payload = jwt.decode(token, settings.SECRET_KEY, algorithms='HS256')
             user_id = payload['user_id']
-            user = User.objects.get(id=user_id)
+            email = payload['email']
+            user = User.objects.get(id=user_id, email=email)
             if not user:
                 return Response({"error": "User not found."}, status=status.HTTP_404_NOT_FOUND)
             if not user.is_verified:
