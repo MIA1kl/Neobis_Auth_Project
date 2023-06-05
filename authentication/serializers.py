@@ -25,9 +25,9 @@ class EmailVerificationSerializer(serializers.ModelSerializer):
         fields = ['token']
 
 class RegisterPersonalInfoSerializer(serializers.Serializer):
-    first_name = serializers.CharField(max_length=255, required=False)
-    last_name = serializers.CharField(max_length=255, required=False)
-    birth_date = serializers.DateField(required=False)
+    first_name = serializers.CharField(max_length=255)
+    last_name = serializers.CharField(max_length=255)
+    birth_date = serializers.DateField()
 
     def update(self, instance, validated_data):
         try:
@@ -42,6 +42,7 @@ class RegisterPersonalInfoSerializer(serializers.Serializer):
 class RegisterPasswordSerializer(serializers.ModelSerializer):
     password = serializers.CharField(required=True, min_length=8, max_length=15)
     password_repeat = serializers.CharField(required=True, min_length=8, max_length=15)
+    
     class Meta:
         model = User
         fields = ['password', 'password_repeat']

@@ -32,6 +32,7 @@ from django.core.mail import EmailMessage
 
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.authentication import SessionAuthentication
+from django.contrib.sessions.backends.db import SessionStore
 
 
 
@@ -58,6 +59,11 @@ class RegisterEmailView(generics.GenericAPIView):
         data = {'email_body': email_body, 'to_email': user.email, 'email_subject': 'Verify your email'}
 
         Util.send_email(data)
+        
+         # Store the user's email in the session
+        session = SessionStore(request.data.get('session_key'))
+        session['user_email'] = user.email
+        session.save()
 
         return Response(user_data, status=status.HTTP_200_OK)
     
@@ -75,6 +81,14 @@ class VerifyEmail(views.APIView):
             if not user.is_verified:
                 user.is_verified = True
                 user.save()
+                
+                 # Retrieve the user's email from the session
+                session = SessionStore(request.GET.get('session_key'))
+                user_email = session.get('user_email')
+
+                # Redirect to the personal info registration page
+                return redirect(reverse('register-personal-info') + f'?email={user_email}')
+           
             return Response({'detail': 'Email successfully activated'}, status=status.HTTP_200_OK)
         except jwt.ExpiredSignatureError:
             return Response({'error': 'Activation link has expired'}, status=status.HTTP_400_BAD_REQUEST)
@@ -90,12 +104,15 @@ class RegisterPersonalInfoView(views.APIView):
         responses={200: 'User updated successfully', 400: 'Bad Request'}
     )
     def put(self, request):
-        user = request.user  # Retrieve the authenticated user
+        user_email = request.GET.get('email')
 
-        # Initialize the serializer with the user object and request data
+        try:
+            # Retrieve the user using the email
+            user = User.objects.get(email=user_email)
+        except User.DoesNotExist:
+            return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
+
         serializer = RegisterPersonalInfoSerializer(user, data=request.data)
-
-        # Validate and update the user data
         if serializer.is_valid():
             serializer.save()
             return Response({'message': 'User updated successfully'})
@@ -115,18 +132,20 @@ class RegisterPasswordView(views.APIView):
         responses={200: 'Password updated successfully', 400: 'Bad Request'}
     )
     def put(self, request):
-        user = request.user  # Retrieve the authenticated user
+        user_email = request.GET.get('email')
 
-        # Initialize the serializer with the user object and request data
+        try:
+            # Retrieve the user using the email
+            user = User.objects.get(email=user_email)
+        except User.DoesNotExist:
+            return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
+
         serializer = RegisterPasswordSerializer(user, data=request.data)
-
-        # Validate and update the user data
         if serializer.is_valid():
             serializer.save()
             return Response({'message': 'Password updated successfully'})
         else:
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
 
         
 
