@@ -109,19 +109,22 @@ class RegisterPersonalInfoView(views.APIView):
     )
     def put(self, request):
         user_email = request.GET.get('email')
-
+        # Compare the email in the request with the email in the session
+        if user_email is None or user_email != request.session.get('email'):
+            return Response({'error': 'Email mismatch'}, status=status.HTTP_400_BAD_REQUEST)
         try:
             # Retrieve the user using the email
             user = User.objects.get(email=user_email)
         except User.DoesNotExist:
             return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
-
+        
         serializer = RegisterPersonalInfoSerializer(user, data=request.data)
         if serializer.is_valid():
             serializer.save()
             user_email = request.session.get('email')
-
-            # Redirect to the personal info registration page
+            # if user_email is None or user_email != user_email:
+            #     return Response({'error': 'Email mismatch'}, status=status.HTTP_400_BAD_REQUEST)
+            # else:
             return redirect(reverse('password') + f'?email={user_email}')
             return Response({'message': 'User updated successfully'})
         else:
@@ -147,6 +150,11 @@ class RegisterPasswordView(views.APIView):
             user = User.objects.get(email=user_email)
         except User.DoesNotExist:
             return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
+        
+          # Check if the user's email is verified
+        if not user.is_verified:
+            return Response({'error': 'Email not verified'}, status=status.HTTP_400_BAD_REQUEST)
+
 
         serializer = RegisterPasswordSerializer(user, data=request.data)
         if serializer.is_valid():
