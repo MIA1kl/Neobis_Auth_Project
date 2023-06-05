@@ -2,26 +2,27 @@ from django.db import models
 
 from django.contrib.auth.models import (AbstractBaseUser, BaseUserManager, PermissionsMixin)
 from rest_framework_simplejwt.tokens import RefreshToken
+import uuid
+from django.utils import timezone
 
 
 class UserManager(BaseUserManager):
-    def create_user(self, username, email, password=None):
-        if username is None:
-            raise TypeError('User should have a username')
+    def create_user(self, email, password=None, **extra_fields):
+
         if email is None:
             raise TypeError('User should have an email')
 
-        user=self.model(username=username, email=self.normalize_email(email))
+        user=self.model(email=self.normalize_email(email))
         user.set_password(password)
         user.save()
         
         return user
     
-    def create_superuser(self, username, email,password=None):
+    def create_superuser(self, email,password=None, **extra_fields):
         if password is None:
             raise TypeError('Superusers must have a password ')
         
-        user=self.create_user(username, email, password)
+        user=self.create_user( email, password,  **extra_fields)
         user.is_superuser = True
         user.is_staff = True
         user.save()
@@ -30,7 +31,6 @@ class UserManager(BaseUserManager):
     
 class User(AbstractBaseUser, PermissionsMixin):
     email = models.EmailField(max_length=255, unique=True, db_index=True)
-    username = models.CharField(max_length=255, unique=True, db_index = True)
     first_name = models.CharField(max_length=255, null=True, blank=True)
     last_name = models.CharField(max_length=255, null=True, blank=True)
     birth_date = models.DateField(null=True, blank=True, default=None)
@@ -42,7 +42,7 @@ class User(AbstractBaseUser, PermissionsMixin):
 
     
     USERNAME_FIELD = 'email'
-    REQUIRED_FIELDS = ['username']
+    REQUIRED_FIELDS = ["first_name", "last_name","birth_date"]
     
     objects = UserManager()
     
@@ -57,3 +57,11 @@ class User(AbstractBaseUser, PermissionsMixin):
             'access': str(refresh.access_token)
         }
         
+class Hash(models.Model):
+    email = models.EmailField(max_length=255, unique=True, db_index=True)
+    hash = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)
+    created_at = models.DateTimeField(default=timezone.now)
+    
+    
+    def __str__(self):
+        return str(self.hash)
