@@ -69,7 +69,6 @@ class RegisterEmailView(generics.GenericAPIView):
          # Store the user's email in the session
         request.session['email'] = user.email
         request.session.save()
-        print("Session Email: "+request.session['email'])
 
         return Response(user_data, status=status.HTTP_200_OK)
     
@@ -89,7 +88,6 @@ class VerifyEmail(views.APIView):
                 user.is_verified = True
                 user.save()
                 
-            # Retrieve the user's email from the query parameters
             user_email = request.session.get('email')
 
             # Redirect to the personal info registration page
@@ -121,6 +119,10 @@ class RegisterPersonalInfoView(views.APIView):
         serializer = RegisterPersonalInfoSerializer(user, data=request.data)
         if serializer.is_valid():
             serializer.save()
+            user_email = request.session.get('email')
+
+            # Redirect to the personal info registration page
+            return redirect(reverse('password') + f'?email={user_email}')
             return Response({'message': 'User updated successfully'})
         else:
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
