@@ -27,11 +27,15 @@ from django.contrib.sites.shortcuts import get_current_site
 from django.urls import reverse
 from .utils import Util
 import uuid
+from django.template.loader import render_to_string
+from django.core.mail import EmailMessage
+
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.authentication import SessionAuthentication
 
 
 
 class CustomRedirect(HttpResponsePermanentRedirect):
-
     allowed_schemes = [os.environ.get('APP_SCHEME'), 'http', 'https']
     
 class RegisterEmailView(generics.GenericAPIView):
@@ -39,81 +43,24 @@ class RegisterEmailView(generics.GenericAPIView):
     renderer_classes = (UserRenderer,)
 
     def post(self, request):
-        user = request.data
-        serializer = self.serializer_class(data=user)
+        email_data= request.data
+        serializer = self.serializer_class(data=email_data)
         serializer.is_valid(raise_exception=True)
-
-        email = serializer.validated_data['email']
-        try:
-            hash_obj = Hash.objects.get(email=email)
-            if hash_obj.is_verified:
-                return Response({'detail': 'Email already exists.'}, status=status.HTTP_400_BAD_REQUEST)
-            else:
-                hash_obj.delete()
-        except Hash.DoesNotExist:
-            pass
         
         serializer.save()
         user_data = serializer.data
-        user = Hash.objects.get(email=user_data['email'])
+        user = User.objects.get(email=user_data['email'])
         token = RefreshToken.for_user(user).access_token
         current_site = get_current_site(request).domain
         relativeLink = reverse('email-verify')
-        absurl = 'http://' + current_site + relativeLink + "?token=" + str(token)
+        absurl = 'http://'+current_site+relativeLink+"?token="+str(token)
         email_body = 'Hi ' + ' Use the link below to verify your email \n' + absurl
         data = {'email_body': email_body, 'to_email': user.email, 'email_subject': 'Verify your email'}
 
         Util.send_email(data)
+
         return Response(user_data, status=status.HTTP_200_OK)
-
-class RegisterPersonalInfoView(generics.GenericAPIView):
-    serializer_class = RegisterPersonalInfoSerializer
-    def post(self, request, hash):
-        serializer = self.get_serializer_class()(data=request.data)
-        if serializer.is_valid():
-            # Retrieve the email associated with the provided hash
-            try:
-                hash_instance = Hash.objects.get(hash=str(uuid.UUID(hash)))
-            except Hash.DoesNotExist:
-                return Response({'detail': 'Invalid verification link.'}, status=status.HTTP_400_BAD_REQUEST)
-            
-            email = hash_instance.email
-            
-            # Ensure that the provided email matches the email in the hash
-            if email != serializer.validated_data['email']:
-                return Response({'detail': 'Email mismatch.'}, status=status.HTTP_400_BAD_REQUEST)
-            
-            # Use the retrieved email and the provided personal info to perform further processing
-            # Store the personal info in session or associate it with the email
-            
-            return Response(status=status.HTTP_200_OK)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
-class RegisterPasswordView(generics.GenericAPIView):
-    serializer_class = RegisterPasswordSerializer
-    def post(self, request):
-        serializer = self.get_serializer(data=request.data)
-        if serializer.is_valid():
-            try:
-                hash_instance = Hash.objects.get(hash=str(uuid.UUID(hash)))
-            except Hash.DoesNotExist:
-                return Response({'detail': 'Invalid verification link.'}, status=status.HTTP_400_BAD_REQUEST)
-            # Retrieve the email and personal info from the session or previous steps
-            email = hash_instance.email
-            
-            # Create the user in the database with the provided password
-            user = User.objects.create_user(email=email, password=serializer.validated_data['password'])
-            
-            # Delete the hash associated with the email
-            Hash.objects.filter(email=email).delete()
-            
-            return Response(status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    
-
-
-
-
 class VerifyEmail(views.APIView):
     serializer_class = EmailVerificationSerializer
 
@@ -123,14 +70,63 @@ class VerifyEmail(views.APIView):
             payload = jwt.decode(token, settings.SECRET_KEY, algorithms='HS256')
             user_id = payload['user_id']
             user = User.objects.get(id=user_id)
+            if not user:
+                return Response({"error": "User not found."}, status=status.HTTP_404_NOT_FOUND)
             if not user.is_verified:
                 user.is_verified = True
                 user.save()
-            return Response({'email': 'Successfully activated'}, status=status.HTTP_200_OK)
+            return Response({'detail': 'Email successfully activated'}, status=status.HTTP_200_OK)
         except jwt.ExpiredSignatureError:
             return Response({'error': 'Activation link has expired'}, status=status.HTTP_400_BAD_REQUEST)
         except (jwt.exceptions.DecodeError, User.DoesNotExist):
             return Response({'error': 'Invalid activation link'}, status=status.HTTP_400_BAD_REQUEST)
+
+
+class RegisterPersonalInfoView(views.APIView):
+    serializer_class = RegisterPersonalInfoSerializer
+    
+    @swagger_auto_schema(
+        request_body=RegisterPersonalInfoSerializer,  
+        responses={200: 'User updated successfully', 400: 'Bad Request'}
+    )
+    def put(self, request):
+        user = request.user  # Retrieve the authenticated user
+
+        # Initialize the serializer with the user object and request data
+        serializer = RegisterPersonalInfoSerializer(user, data=request.data)
+
+        # Validate and update the user data
+        if serializer.is_valid():
+            serializer.save()
+            return Response({'message': 'User updated successfully'})
+        else:
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+
+    
+class RegisterPasswordView(views.APIView):
+
+    serializer_class = RegisterPasswordSerializer
+
+
+    @swagger_auto_schema(
+        request_body=RegisterPasswordSerializer,  
+        responses={200: 'Password updated successfully', 400: 'Bad Request'}
+    )
+    def put(self, request):
+        user = request.user  # Retrieve the authenticated user
+
+        # Initialize the serializer with the user object and request data
+        serializer = RegisterPasswordSerializer(user, data=request.data)
+
+        # Validate and update the user data
+        if serializer.is_valid():
+            serializer.save()
+            return Response({'message': 'Password updated successfully'})
+        else:
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
 
         
 
