@@ -67,9 +67,9 @@ class RegisterEmailView(generics.GenericAPIView):
         Util.send_email(data)
         
          # Store the user's email in the session
-        session = SessionStore(request.data.get('session_key'))
-        session['email'] = user.email
-        session.save()
+        request.session['email'] = user.email
+        request.session.save()
+        print("Session Email: "+request.session['email'])
 
         return Response(user_data, status=status.HTTP_200_OK)
     
@@ -89,12 +89,11 @@ class VerifyEmail(views.APIView):
                 user.is_verified = True
                 user.save()
                 
-                 # Retrieve the user's email from the session
-                session = SessionStore(request.GET.get('session_key'))
-                user_email = session.get('email', None)
+            # Retrieve the user's email from the query parameters
+            user_email = request.session.get('email')
 
-                # Redirect to the personal info registration page
-                return redirect(reverse('register-personal-info') + f'?email={user_email}')
+            # Redirect to the personal info registration page
+            return redirect(reverse('register-personal-info') + f'?email={user_email}')
            
             return Response({'detail': 'Email successfully activated'}, status=status.HTTP_200_OK)
         except jwt.ExpiredSignatureError:
