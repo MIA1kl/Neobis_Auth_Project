@@ -99,7 +99,6 @@ class VerifyEmail(views.APIView):
         except (jwt.exceptions.DecodeError, User.DoesNotExist):
             return Response({'error': 'Invalid activation link'}, status=status.HTTP_400_BAD_REQUEST)
 
-
 class RegisterPersonalInfoView(views.APIView):
     serializer_class = RegisterPersonalInfoSerializer
     
@@ -108,28 +107,29 @@ class RegisterPersonalInfoView(views.APIView):
         responses={200: 'User updated successfully', 400: 'Bad Request'}
     )
     def put(self, request):
-        user_email = request.GET.get('email')
-        # Compare the email in the request with the email in the session
-        if user_email is None or user_email != request.session.get('email'):
+        user_email = request.data.get('email')
+        session_email = request.session.get('email')
+        print("email field: "+ user_email)
+        print("email session: "+ session_email)
+        
+        # Check if both email values are present and match
+        if not user_email or not session_email or user_email != session_email:
             return Response({'error': 'Email mismatch'}, status=status.HTTP_400_BAD_REQUEST)
+        
         try:
             # Retrieve the user using the email
-            user = User.objects.get(email=user_email)
+            user = User.objects.get(email=session_email)  # Use session_email instead of user_email
         except User.DoesNotExist:
             return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
         
         serializer = RegisterPersonalInfoSerializer(user, data=request.data)
         if serializer.is_valid():
             serializer.save()
-            user_email = request.session.get('email')
-            # if user_email is None or user_email != user_email:
-            #     return Response({'error': 'Email mismatch'}, status=status.HTTP_400_BAD_REQUEST)
-            # else:
-            return redirect(reverse('password') + f'?email={user_email}')
-            return Response({'message': 'User updated successfully'})
-        else:
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
+            
+            # Redirect to the password registration page
+            return redirect(reverse('password') + f'?email={session_email}')  # Use session_email instead of user_email
+        
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
     
