@@ -135,12 +135,10 @@ class RegisterPersonalInfoView(views.APIView):
 
     
 class RegisterPasswordView(views.APIView):
-
     serializer_class = RegisterPasswordSerializer
 
-
     @swagger_auto_schema(
-        request_body=RegisterPasswordSerializer,  
+        request_body=RegisterPasswordSerializer,
         responses={200: 'Password updated successfully', 400: 'Bad Request'}
     )
     def put(self, request):
@@ -151,18 +149,18 @@ class RegisterPasswordView(views.APIView):
             user = User.objects.get(email=user_email)
         except User.DoesNotExist:
             return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
-        
-          # Check if the user's email is verified
+
+        # Check if the user's email is verified
         if not user.is_verified:
             return Response({'error': 'Email not verified'}, status=status.HTTP_400_BAD_REQUEST)
 
-
-        serializer = RegisterPasswordSerializer(data=request.data)
+        serializer = RegisterPasswordSerializer(user, data=request.data)
         if serializer.is_valid():
-            serializer.save(user=user)
+            serializer.save()
             return Response({'message': 'Password updated successfully'})
         else:
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
 
         
 
