@@ -33,6 +33,7 @@ from django.core.mail import EmailMessage
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.authentication import SessionAuthentication
 from django.contrib.sessions.backends.db import SessionStore
+from datetime import datetime, timedelta
 
 
 
@@ -156,9 +157,9 @@ class RegisterPasswordView(views.APIView):
             return Response({'error': 'Email not verified'}, status=status.HTTP_400_BAD_REQUEST)
 
 
-        serializer = RegisterPasswordSerializer(user, data=request.data)
+        serializer = RegisterPasswordSerializer(data=request.data)
         if serializer.is_valid():
-            serializer.save()
+            serializer.save(user=user)
             return Response({'message': 'Password updated successfully'})
         else:
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
