@@ -55,8 +55,11 @@ class RegisterPasswordSerializer(serializers.ModelSerializer):
         return attrs
 
     def update(self, instance, validated_data):
-        instance.set_password(validated_data['password'])
-        instance.save()
+        try:
+            instance.set_password(validated_data['password'])
+            instance.save()
+        except AttributeError:
+            pass
         return instance
         
 class LoginSerializer(serializers.ModelSerializer):
