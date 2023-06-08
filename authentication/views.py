@@ -68,9 +68,7 @@ class RegisterEmailView(generics.GenericAPIView):
 
         Util.send_email(data)
         
-         # Store the user's email in the session
-        request.session['email'] = user.email
-        request.session.save()
+        token_payload = {'email': user.email}
 
         return Response(user_data, status=status.HTTP_200_OK)
     
@@ -90,54 +88,49 @@ class VerifyEmail(views.APIView):
                 user.is_verified = True
                 user.save()
                 
-            user_email = request.session.get('email')
+            
+            return redirect(reverse('register-personal-info') + f'?email={email}')
 
             # Redirect to the personal info registration page
             #return redirect('http://localhost:3000/userinfo')
-            return redirect(reverse('register-personal-info') + f'?email={user_email}')
+            
            
-            # return Response({'detail': 'Email successfully activated'}, status=status.HTTP_200_OK)
+            #return Response({'detail': 'Email successfully activated'}, status=status.HTTP_200_OK)
         except jwt.ExpiredSignatureError:
             return Response({'error': 'Activation link has expired'}, status=status.HTTP_400_BAD_REQUEST)
         except (jwt.exceptions.DecodeError, User.DoesNotExist):
             return Response({'error': 'Invalid activation link'}, status=status.HTTP_400_BAD_REQUEST)
 
-from django.shortcuts import redirect
+
 
 class RegisterPersonalInfoView(views.APIView):
     serializer_class = RegisterPersonalInfoSerializer
     
     def put(self, request):
-        user_email = request.data.get('email')
-        session_email = request.session.get('email')
-        
-        # Check if both email values are present and match
-        if not user_email or not session_email or user_email != session_email:
+        user_email = request.GET.get('email')
+
+        user_email = user_email.rstrip('/')
+        email_field = request.data.get('email')
+        print(user_email)
+        print("field",email_field)
+
+        if not user_email or not email_field or user_email != email_field:
             return Response({'error': 'Email mismatch'}, status=status.HTTP_400_BAD_REQUEST)
-        
+
         try:
             # Retrieve the user using the email
-            user = User.objects.get(email=session_email)
+            user = User.objects.get(email=email_field)
         except User.DoesNotExist:
             return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
-        
+
         serializer = RegisterPersonalInfoSerializer(user, data=request.data)
         if serializer.is_valid():
             serializer.save()
-            
-            # # Redirect to the password registration page
-            # password_url = 'http://127.0.0.1:8000/auth/register/password/'
-            # redirect_url = f"{password_url}?email={quote_plus(session_email)}"
-            
-            # # Remove the existing 'email' key from the session
-            # if 'email' in request.session:
-            #     del request.session['email']
-            
-            # return redirect(redirect_url)
-            return Response(data={"email":user_email}, status=status.HTTP_200_OK)
-        
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+            return Response(data={"email": user_email}, status=status.HTTP_200_OK)
+
+
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
     
