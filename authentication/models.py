@@ -35,6 +35,8 @@ class User(AbstractBaseUser, PermissionsMixin):
     last_name = models.CharField(max_length=255, null=True, blank=True)
     birth_date = models.DateField(null=True, blank=True, default=None)
     is_verified = models.BooleanField(default=False)
+    is_reg_password = models.BooleanField(default=False)
+    is_reg_personal_info = models.BooleanField(default=False)
     is_active = models.BooleanField(default=True)
     is_staff = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -58,7 +60,7 @@ class User(AbstractBaseUser, PermissionsMixin):
         }
         
 class Hash(models.Model):
-    email = models.EmailField(max_length=255, unique=True, db_index=True)
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
     hash = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)
     created_at = models.DateTimeField(default=timezone.now)
     

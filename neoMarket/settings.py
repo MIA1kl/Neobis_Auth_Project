@@ -149,5 +149,7 @@ EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD')
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': datetime.timedelta(minutes=10),
     'REFRESH_TOKEN_LIFETIME': datetime.timedelta(days=1),
-    "TOKEN_OBTAIN_SERIALIZER": "rest_framework_simplejwt.serializers.MyTokenObtainPairSerializer",
+    #"TOKEN_OBTAIN_SERIALIZER": "rest_framework_simplejwt.serializers.MyTokenObtainPairSerializer",
+    'USER_ID_FIELD': "id",
+    "USER_ID_CLAIM": "user_id"
 }
